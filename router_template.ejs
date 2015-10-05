@@ -110,4 +110,21 @@ func Install<%=capitalizeName%>Router(db gorm.DB, router *gin.Engine) {
 		}
 	})
 
+	router.DELETE("/<%=name%>/:id", func(c *gin.Context) {
+		_id := c.Param("id")
+		if id, err := strconv.ParseUint(_id, 10, 64); err == nil {
+			<%=name%> := &model.<%=capitalizeName%>{
+				<%=capitalizeName%>Id: model.<%=capitalizeName%>Id {Id: id},
+			}
+			if err := db.First(<%=name%>).Error; err == nil {
+				db.Delete(<%=name%>)
+				c.AbortWithStatus(http.StatusOK)
+			} else {
+				c.AbortWithStatus(http.StatusNotFound)
+			}
+		} else {
+			log.Print(err)
+			c.AbortWithError(http.StatusBadRequest, err)
+		}
+	})
 }

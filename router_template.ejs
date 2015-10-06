@@ -4,6 +4,7 @@ import (
 	log "log"
 	http "net/http"
 	strconv "strconv"
+	reflect "reflect"
 
 	gin "github.com/gin-gonic/gin"
 	gorm "github.com/jinzhu/gorm"
@@ -13,6 +14,14 @@ import (
 )
 
 func Install<%=capitalizeName%>Router(db gorm.DB, router *gin.Engine) {
+	GetAll<%=capitalizeName%>(db, router)
+	GetById<%=capitalizeName%>(db, router)
+	Post<%=capitalizeName%>(db, router)
+	Put<%=capitalizeName%>(db, router)
+	Delete<%=capitalizeName%>(db, router)
+}
+
+func GetAll<%=capitalizeName%>(db gorm.DB, router *gin.Engine) {
 
 	// GET /<%=name%>
 	// GET all <%=name%>
@@ -32,7 +41,9 @@ func Install<%=capitalizeName%>Router(db gorm.DB, router *gin.Engine) {
 		db.Find(&<%=name%>)
 		c.JSON(http.StatusOK, <%=name%>) <% } %>
 	})
+}
 
+func GetById<%=capitalizeName%>(db gorm.DB, router *gin.Engine) {
 	// GET /<%=name%>/:id
 	// GET <%=name%> by id
 	router.GET("/<%=name%>/:id", func(c *gin.Context) {
@@ -42,14 +53,19 @@ func Install<%=capitalizeName%>Router(db gorm.DB, router *gin.Engine) {
 			query := &model.<%=capitalizeName%>{
 				<%=capitalizeName%>Id: model.<%=capitalizeName%>Id{Id: id},
 			}
-			db.Where(&query).First(&<%=name%>)
-			c.JSON(http.StatusOK, <%=name%>)
+			if err := db.Where(&query).First(&<%=name%>).Error; err == nil {
+				c.JSON(http.StatusOK, <%=name%>)
+			} else {
+				c.AbortWithError(http.StatusNotFound, err)
+			}
 		} else {
 			log.Print(err)
 			c.AbortWithError(http.StatusBadRequest, err)
 		}
 	})
+}
 
+func Post<%=capitalizeName%>(db gorm.DB, router *gin.Engine) {
 	// POST /<%=name%>
 	// POST new <%=name%> to database
 	router.POST("/<%=name%>", func(c *gin.Context) {
@@ -66,10 +82,14 @@ func Install<%=capitalizeName%>Router(db gorm.DB, router *gin.Engine) {
 					x_user = conv_user
 					<%=name%>.Trace.CreatedBy = x_user
 					<%=name%>.Trace.UpdatedBy = x_user
-					if err := db.Create(&<%=name%>).Error; err != nil {
-						c.AbortWithError(http.StatusBadRequest, err)
+					if err := checkData<%=capitalizeName%>(<%=name%>.<%=capitalizeName%>Data); err {
+						if err := db.Create(&<%=name%>).Error; err != nil {
+							c.AbortWithError(http.StatusBadRequest, err)
+						} else {
+							c.JSON(http.StatusCreated, <%=name%>)
+						}
 					} else {
-						c.JSON(http.StatusOK, <%=name%>)
+						c.AbortWithStatus(http.StatusBadRequest)
 					}
 				} else {
 					c.AbortWithStatus(http.StatusForbidden)
@@ -86,7 +106,9 @@ func Install<%=capitalizeName%>Router(db gorm.DB, router *gin.Engine) {
 			c.AbortWithError(http.StatusBadRequest, err)
 		}
 	})
+}
 
+func Put<%=capitalizeName%>(db gorm.DB, router *gin.Engine) {
 	// PUT /<%=name%>
 	// Update <%=name%> data by id
 	router.PUT("/<%=name%>/:id", func(c *gin.Context) {
@@ -98,10 +120,19 @@ func Install<%=capitalizeName%>Router(db gorm.DB, router *gin.Engine) {
 					<%=capitalizeName%>Data: <%=name%>Data,
 					<%=capitalizeName%>Id: model.<%=capitalizeName%>Id {Id: id},
 				}
-				if err := db.Save(&<%=name%>).Error; err != nil {
-					c.AbortWithError(http.StatusBadRequest, err)
+				if err := checkData<%=capitalizeName%>(<%=name%>.<%=capitalizeName%>Data); err {
+					check<%=capitalizeName%> := &model.<%=capitalizeName%>{
+						<%=capitalizeName%>Data: <%=name%>Data,
+						<%=capitalizeName%>Id: model.<%=capitalizeName%>Id {Id: id},
+					}
+					if err := db.First(check<%=capitalizeName%>).Error; err == nil {
+						db.Save(&<%=name%>)
+						c.JSON(http.StatusOK, <%=name%>)
+					} else {
+						c.AbortWithStatus(http.StatusNotFound)
+					}
 				} else {
-					c.JSON(http.StatusOK, <%=name%>)
+					c.AbortWithStatus(http.StatusBadRequest)
 				}
 			}
 		} else {
@@ -109,6 +140,9 @@ func Install<%=capitalizeName%>Router(db gorm.DB, router *gin.Engine) {
 			c.AbortWithError(http.StatusBadRequest, err)
 		}
 	})
+}
+
+func Delete<%=capitalizeName%>(db gorm.DB, router *gin.Engine) {
 
 	router.DELETE("/<%=name%>/:id", func(c *gin.Context) {
 		_id := c.Param("id")
@@ -127,4 +161,17 @@ func Install<%=capitalizeName%>Router(db gorm.DB, router *gin.Engine) {
 			c.AbortWithError(http.StatusBadRequest, err)
 		}
 	})
+}
+
+func checkData<%=capitalizeName%>(data model.<%=capitalizeName%>Data) bool {
+	reflectStruct := reflect.ValueOf(data)
+	values := make([]interface{}, reflectStruct.NumField())
+
+	for i := 0; i < reflectStruct.NumField(); i++ {
+		values[i] = reflectStruct.Field(i).Interface()
+		if values[i] == "" {
+			return false
+		}
+	}
+	return true
 }

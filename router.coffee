@@ -34,7 +34,7 @@ listTables = ->
       writeRouterMethod t
       capitalizeTables.push(S(t).classify().capitalize().value())
     )
-    fs.writeFile './router/install_router.go', ''
+    fs.writeFileSync './router/install_router.go', ''
     file = fs.readFileSync './install_router.ejs', 'utf8'
     data = ejs.render(file, {t: capitalizeTables}, null)
     fs.appendFile './router/install_router.go', data
@@ -84,7 +84,7 @@ writeRouterMethod = (tableName) ->
           jsonAttribute = attribute[0].toLowerCase() + attribute.substr(1)  # lowercase the attribute for json
           table.addAttribtue(attribute, modelType, jsonAttribute)
 
-    fs.writeFile './router/'+table.name+'.go', ''
+    fs.writeFileSync './router/'+table.name+'.go', ''
     file = fs.readFileSync './router_template.ejs', 'utf8'
     data = ejs.render(file, table, null)
     fs.appendFile './router/'+table.name+'.go', data

@@ -7,19 +7,17 @@ ejs = require 'ejs'
 connection =
   mysql.createConnection
     host: 'localhost'
-    user: 'humhub'
-    password: 'humhub'
-    database: 'humhub'
+    user: 'go_generator'
+    password: 'go_generator'
+    database: 'go_generator'
 
 connection.connect()
 
 createHierarcy = ->
-  fs.exists __dirname+'/model', (model_exists) ->
-    unless model_exists
-      fs.mkdir __dirname+'/model'
-    file = fs.readFileSync './init_model.ejs', 'utf8'
-    data = ejs.render(file)
-    fs.writeFile './model/models.go', data
+  fs.exists __dirname+'/router', (router_exists) ->
+    unless router_exists
+      fs.mkdir __dirname+'/router', ->
+    else
 
 query = (sql, callback) ->
   connection.query sql, (err, rows, fields) ->
@@ -28,19 +26,28 @@ query = (sql, callback) ->
     else
       callback(rows, fields)
 
-listTables = () ->
+listTables = ->
   query 'show tables', (rows, fields) ->
     tables = _(rows).map( (r) -> r['Tables_in_humhub'])
-    _(tables).forEach( (t) -> writeTableStruct t)
+    capitalizeTables = []
+    _(tables).forEach( (t) ->
+      writeRouterMethod t
+      capitalizeTables.push(S(t).classify().capitalize().value())
+    )
+    fs.writeFileSync './router/install_router.go', ''
+    file = fs.readFileSync './install_router.ejs', 'utf8'
+    data = ejs.render(file, {t: capitalizeTables}, null)
+    fs.appendFile './router/install_router.go', data
 
 class Attribute
   constructor: (@name, @type, @tag) ->
 
 class Table
   constructor: (@name) ->
+    @capitalizeName = S(@name).classify().capitalize().value()
     @trace = false
+    @guid = false
     @attributes = []
-
   addAttribtue: (name, type, tag) ->
     newAttribute = new Attribute(name, type, tag)
     @attributes.push(newAttribute)
@@ -53,7 +60,6 @@ modifyFieldType = (type) ->
     else  #type contains (text, varchar)
       return "string"
 
-
 traceTable = (attribute) ->
   switch attribute
     when "CreatedAt", "CreatedBy", "UpdatedAt", "UpdatedBy"
@@ -61,10 +67,9 @@ traceTable = (attribute) ->
     else
       return false
 
-writeTableStruct = (tableName) ->
-
+writeRouterMethod = (tableName) ->
   query "describe humhub.#{tableName}", (rows, fields) ->
-    table = new Table(S(tableName).classify().capitalize().value())
+    table = new Table(tableName)
 
     _(rows).forEach (r) ->
       attribute = S(r.Field).classify().capitalize().value()
@@ -74,14 +79,16 @@ writeTableStruct = (tableName) ->
           table.trace = true
         else
           modelType = modifyFieldType(type)  # convert sqlType to modelType
+          if (attribute == "Guid")
+            table.guid = true
           jsonAttribute = attribute[0].toLowerCase() + attribute.substr(1)  # lowercase the attribute for json
           table.addAttribtue(attribute, modelType, jsonAttribute)
 
-    file = fs.readFileSync './model_template.ejs', 'utf8'
-    data = ejs.render(file, table)
+    fs.writeFileSync './router/'+table.name+'.go', ''
+    file = fs.readFileSync './router_template.ejs', 'utf8'
+    data = ejs.render(file, table, null)
+    fs.appendFile './router/'+table.name+'.go', data
 
-    fs.appendFile './model/models.go', data
 
 createHierarcy()
-
 listTables()
